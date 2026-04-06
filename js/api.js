@@ -15,6 +15,7 @@
  */
 
 import State from './state.js';
+import { getToken } from './auth.js';
 
 export const CONFIG = {
   BASE_URL: 'https://your-backend.com/api',  // ← your Spring Boot base URL
@@ -176,9 +177,22 @@ const MOCK = (() => {
 
 // ─── HTTP helper ───────────────────────────────────────────────────────────────
 async function http(method, path, body = null) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const token = getToken();
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${CONFIG.BASE_URL}${path}`, opts);
+  if (res.status === 401) {
+    // Token expired or invalid — force re-login
+    sessionStorage.removeItem('lc_session');
+    window.location.replace('login.html');
+    return null;
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   return res.json();
 }

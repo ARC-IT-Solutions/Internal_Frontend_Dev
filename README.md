@@ -1,65 +1,121 @@
 # Lead Console — Internal Dashboard
-Inquiries + Client Ticket Management · Vanilla JS · Zero build step
+Inquiries + Client Tickets + Role-Based Auth · Vanilla JS · Zero build step
 
 ---
 
-## System Architecture
+## Project Structure
 
 ```
-3 frontends, 1 Spring Boot backend
-─────────────────────────────────────────────────────────
-  [Your Website]          → POST /api/inquiries        (public form submit)
-  [Client Portal]         → POST /api/tickets          (onboarded client raises ticket)
-  [This: Lead Console]    → GET/PATCH /api/inquiries   (staff manage inquiries)
-                          → GET/PATCH /api/tickets     (staff manage tickets)
-                          → POST /api/tickets/:id/replies
+lead-console/
+├── login.html              ← Login page (entry point)
+├── index.html              ← Main dashboard (auth-guarded)
+├── css/
+│   ├── login.css           ← Login page styles
+│   └── main.css            ← Dashboard styles + role-gated CSS
+└── js/
+    ├── auth.js             ← Auth logic, session, roles, permissions
+    ├── state.js            ← Unified store (inquiries, tickets, user)
+    ├── api.js              ← All HTTP calls + mock data
+    ├── ui.js               ← DOM rendering (role-aware throughout)
+    ├── notify.js           ← Push, audio, badge, visual bar
+    └── main.js             ← Boot, auth guard, event wiring
 ```
-
-All three frontends talk to the **same Spring Boot backend** via REST.
-This console is read-write for staff. The client portal is write-only for clients.
 
 ---
 
 ## Quick Start
 
-No build tools. No npm. No webpack. Serve the folder:
-
 ```bash
-# Python
 python3 -m http.server 8080
-
-# Node
-npx serve .
-
-# VS Code: Live Server extension
+# open http://localhost:8080/login.html
 ```
 
-Open `http://localhost:8080`
+ES Modules require HTTP — not `file://`.
 
-ES Modules require HTTP — not `file://` double-click.
+---
+
+## Roles & Permissions
+
+| Permission          | Admin | Manager | Agent | Viewer |
+|---------------------|:-----:|:-------:|:-----:|:------:|
+| View all items      | ✓     | ✓       | —     | ✓      |
+| View own items only | —     | —       | ✓     | —      |
+| Update status       | ✓     | ✓       | ✓     | —      |
+| Assign/Reassign     | ✓     | ✓       | —     | —      |
+| Change priority     | ✓     | ✓       | —     | —      |
+| Send replies        | ✓     | ✓       | ✓     | —      |
+| Manage users        | ✓     | —       | —     | —      |
+
+**Agents** only see items assigned to them or unassigned.
+**Viewers** see everything but can only read — no status changes, no replies.
+
+---
+
+## Demo Users (Mock Mode)
+
+| Name          | Email                  | Password   | Role    |
+|---------------|------------------------|------------|---------|
+| Admin User    | admin@company.com      | admin123   | Admin   |
+| Ahmed Hassan  | ahmed@company.com      | ahmed123   | Manager |
+| Sara Malik    | sara@company.com       | sara123    | Agent   |
+| Khalid Nasser | khalid@company.com     | khalid123  | Agent   |
+| Nour Ibrahim  | nour@company.com       | nour123    | Agent   |
+| Rami Saleh    | rami@company.com       | rami123    | Viewer  |
 
 ---
 
 ## Connect Your Backend
 
-Edit the top of `js/api.js`:
-
+**1. Set config in `js/api.js`:**
 ```js
 const CONFIG = {
-  BASE_URL: 'https://your-springboot-app.com/api',  // ← your backend
-  POLL_INTERVAL_MS: 15000,
-  MOCK: false,  // ← flip to false
+  BASE_URL: 'https://your-springboot-app.com/api',
+  MOCK: false,
 };
+```
+
+**2. Update login in `js/auth.js`** — uncomment the production block in `login()`:
+```js
+// Swap mock section for:
+const res = await fetch('/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password }),
+});
+const { token, user } = await res.json();
+// user must have: { id, name, email, role, avatar, department }
+// role must be: 'admin' | 'manager' | 'agent' | 'viewer'
 ```
 
 ---
 
 ## Spring Boot API Contract
 
-### CORS
+### Auth
 
-Your Spring Boot app must allow the console's origin:
+#### `POST /api/auth/login`
+```json
+// Request
+{ "email": "ahmed@company.com", "password": "ahmed123" }
 
+// Response 200
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "id": "usr_002",
+    "name": "Ahmed Hassan",
+    "email": "ahmed@company.com",
+    "role": "manager",
+    "avatar": "AH",
+    "department": "Sales"
+  }
+}
+
+// Response 401
+{ "message": "Invalid email or password." }
+```
+
+### CORS Config (Spring Boot)
 ```java
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
@@ -73,288 +129,167 @@ public class CorsConfig implements WebMvcConfigurer {
 }
 ```
 
+### JWT Security (Spring Boot)
+```java
+// All requests to /api/** except /api/auth/** require Bearer token
+// Extract role from JWT claims: claims.get("role", String.class)
+// Role values: "admin", "manager", "agent", "viewer"
+```
+
+### All Other Endpoints
+
+All requests include: `Authorization: Bearer <token>`
+
+If backend returns `401`, the console auto-redirects to `login.html`.
+
+```
+GET    /api/inquiries              → list
+PATCH  /api/inquiries/:id          → update status/assign/read
+GET    /api/tickets                → list
+PATCH  /api/tickets/:id            → update status/priority/assign/read
+POST   /api/tickets/:id/replies    → { body: "..." }
+GET    /api/employees              → ["Ahmed", "Sara", ...]
+GET    /api/clients                → [{ id, name, email }, ...]
+```
+
+Full request/response shapes are in the previous version of this README.
+
 ---
 
-### Authentication (recommended)
+## Session
 
-Add a Bearer token header. In `api.js` `http()` function, add:
+- Sessions stored in `sessionStorage` — expire on tab close
+- 8-hour session duration (configurable in `auth.js`)
+- Token sent as `Authorization: Bearer <token>` on every API call
+- 401 response from any endpoint → auto logout + redirect to login
+
+To use `localStorage` instead (persist across tabs), change in `auth.js`:
+```js
+// Replace all sessionStorage calls with localStorage
+localStorage.setItem(SESSION_KEY, ...)
+localStorage.getItem(SESSION_KEY)
+localStorage.removeItem(SESSION_KEY)
+```
+
+---
+
+## Adding New Roles
+
+Edit `auth.js`:
 
 ```js
-headers: {
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('staff_token')}`,
-},
-```
+export const ROLES = {
+  admin:      { label: 'Admin',      level: 4 },
+  manager:    { label: 'Manager',    level: 3 },
+  supervisor: { label: 'Supervisor', level: 2.5 }, // ← new role
+  agent:      { label: 'Agent',      level: 2 },
+  viewer:     { label: 'Viewer',     level: 1 },
+};
 
----
-
-### Inquiry Endpoints
-
-#### `GET /api/inquiries`
-
-Query params: `limit`, `sort` (`asc`|`desc`), `status`
-
-**Response** `200 OK`:
-```json
-[
-  {
-    "id": "inq_001",
-    "name": "Sarah Mitchell",
-    "phone": "+971501234567",
-    "email": "sarah@email.com",
-    "service_type": "Kitchen Renovation",
-    "message": "Full kitchen remodel, budget 50k...",
-    "timestamp": "2025-04-05T09:32:00Z",
-    "status": "new",
-    "assigned_to": "Unassigned",
-    "read": false,
-    "source": "website_form"
-  }
-]
-```
-
-Status values: `new` | `contacted` | `in_progress` | `closed`
-
-#### `PATCH /api/inquiries/{id}`
-
-**Request body** (any subset):
-```json
-{
-  "status": "contacted",
-  "assigned_to": "Ahmed",
-  "read": true
-}
-```
-
-**Response** `200 OK`: Updated inquiry object.
-
----
-
-### Ticket Endpoints
-
-#### `GET /api/tickets`
-
-Query params: `limit`, `sort`, `status`, `priority`, `client_id`
-
-**Response** `200 OK`:
-```json
-[
-  {
-    "id": "tkt_001",
-    "ticket_number": "TKT-1001",
-    "client_id": "cli_001",
-    "client_name": "Priya Sharma",
-    "client_email": "priya.s@work.com",
-    "project": "Office Fitout — Al Quoz",
-    "category": "Delay",
-    "subject": "Electrical work not started on schedule",
-    "description": "Full description of the issue...",
-    "priority": "high",
-    "status": "open",
-    "assigned_to": "Ahmed",
-    "created_at": "2025-04-05T07:00:00Z",
-    "updated_at": "2025-04-05T07:00:00Z",
-    "read": false,
-    "replies": []
-  }
-]
-```
-
-Priority values:   `low` | `medium` | `high` | `critical`
-Status values:     `open` | `in_progress` | `pending` | `resolved` | `closed`
-Category examples: `Delay` | `Material Issue` | `Invoice Query` | `Snagging` | `Clarification`
-
-#### `PATCH /api/tickets/{id}`
-
-**Request body** (any subset):
-```json
-{
-  "status": "in_progress",
-  "priority": "critical",
-  "assigned_to": "Sara",
-  "read": true
-}
-```
-
-#### `POST /api/tickets/{id}/replies`
-
-**Request body**:
-```json
-{
-  "body": "Hi James, I have escalated this to the procurement team..."
-}
-```
-
-**Response** `201 Created`:
-```json
-{
-  "id": "rep_005",
-  "author": "Ahmed",
-  "author_role": "staff",
-  "body": "Hi James, I have escalated this to the procurement team...",
-  "created_at": "2025-04-05T10:15:00Z"
-}
-```
-
-`author_role`: `staff` | `client`
-
----
-
-### Employee & Client Endpoints
-
-#### `GET /api/employees`
-```json
-["Unassigned", "Ahmed", "Sara", "Khalid", "Nour", "Rami"]
-```
-
-#### `GET /api/clients`
-```json
-[
-  { "id": "cli_001", "name": "Priya Sharma", "email": "priya.s@work.com" }
-]
-```
-
----
-
-## Spring Boot Entity Examples
-
-### Inquiry Entity (JPA)
-```java
-@Entity
-@Table(name = "inquiries")
-public class Inquiry {
-    @Id private String id;
-    private String name;
-    private String phone;
-    private String email;
-    private String serviceType;
-    @Lob private String message;
-    private Instant timestamp;
-    private String status;      // new, contacted, in_progress, closed
-    private String assignedTo;
-    private Boolean read;
-    private String source;
-}
-```
-
-### Ticket Entity (JPA)
-```java
-@Entity
-@Table(name = "tickets")
-public class Ticket {
-    @Id private String id;
-    private String ticketNumber;
-    private String clientId;
-    private String clientName;
-    private String clientEmail;
-    private String project;
-    private String category;
-    private String subject;
-    @Lob private String description;
-    private String priority;    // low, medium, high, critical
-    private String status;      // open, in_progress, pending, resolved, closed
-    private String assignedTo;
-    private Instant createdAt;
-    private Instant updatedAt;
-    private Boolean read;
-
-    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL)
-    private List<TicketReply> replies;
-}
-
-@Entity
-@Table(name = "ticket_replies")
-public class TicketReply {
-    @Id private String id;
-    @ManyToOne @JoinColumn(name = "ticket_id") private Ticket ticket;
-    private String author;
-    private String authorRole;  // staff | client
-    @Lob private String body;
-    private Instant createdAt;
-}
-```
-
----
-
-## File Structure
-
-```
-lead-console/
-├── index.html          ← App shell. No logic.
-├── css/
-│   └── main.css        ← All styles. Dark theme. Responsive.
-└── js/
-    ├── main.js         ← Boot, event wiring, polling
-    ├── state.js        ← Unified store: inquiries + tickets + UI state
-    ├── api.js          ← All HTTP calls + mock data
-    ├── ui.js           ← All DOM rendering
-    └── notify.js       ← Push, audio, badge, visual bar
-```
-
----
-
-## Features
-
-| Feature | Inquiries | Tickets |
-|---------|-----------|---------|
-| Real-time list (15s poll) | ✓ | ✓ |
-| Browser push notification | ✓ | ✓ |
-| Audio chime (different per type) | ✓ | ✓ |
-| Tab badge count | ✓ | ✓ |
-| Status filter | ✓ | ✓ |
-| Priority filter | — | ✓ |
-| Status management | ✓ | ✓ |
-| Assignment | ✓ | ✓ |
-| Overdue detection | 15 min | By priority SLA |
-| Quick actions | Call, WhatsApp, Email | Email, Resolve, Close |
-| Reply thread | — | ✓ (Ctrl+Enter to send) |
-| Mobile responsive | ✓ | ✓ |
-| Keyboard navigation | ✓ | ✓ |
-| Optimistic UI updates | ✓ | ✓ |
-
----
-
-## Overdue SLA (Tickets)
-
-| Priority | Overdue after |
-|----------|--------------|
-| Critical | 4 hours |
-| High     | 8 hours |
-| Medium   | 24 hours |
-| Low      | 72 hours |
-
-Adjust in `state.js → isTicketOverdue()`.
-
----
-
-## Polling vs WebSocket
-
-Default: polls every 15 seconds.
-
-To upgrade to WebSocket (in `main.js`, after `API.startPolling()` remove it and add):
-
-```js
-const ws = new WebSocket('wss://your-backend.com/ws');
-ws.onmessage = ({ data }) => {
-  const msg = JSON.parse(data);
-  if (msg.type === 'new_inquiry') {
-    const newOnes = State.setInquiries([...State.getAllInquiries(), msg.payload]);
-    Notify.triggerForNewInquiries(newOnes);
-    UI.renderInquiryList();
-  }
-  if (msg.type === 'new_ticket') {
-    const newOnes = State.setTickets([...State.getAllTickets(), msg.payload]);
-    Notify.triggerForNewTickets(newOnes);
-    UI.renderTicketList();
-  }
+export const CAN = {
+  updateStatus:   (role) => ['admin','manager','supervisor','agent'].includes(role),
+  assign:         (role) => ['admin','manager','supervisor'].includes(role),
+  // ...
 };
 ```
 
-No other files need changing.
+Then add a CSS class in `main.css`:
+```css
+.role-supervisor { background: rgba(163,113,247,.15); color: #a371f7; }
+```
+
+---
+
+## File Routing
+
+| URL                        | Behaviour                          |
+|----------------------------|------------------------------------|
+| `/login.html`              | Login page (always public)         |
+| `/index.html`              | Auth-guarded — redirects to login if no session |
+| Any other page             | Add `getSession()` check in script |
+
+The guard in `main.js`:
+```js
+const currentUser = getSession();
+if (!currentUser) {
+  window.location.replace('login.html');
+  return;
+}
+```
 
 ---
 
 ## Browser Support
+Chrome 80+, Firefox 75+, Safari 14+, Edge 80+. No IE. ES Modules required.
 
-Chrome 80+, Firefox 75+, Safari 14+, Edge 80+.
-Requires ES Modules. No IE.
+---
+
+## Authentication & Role System
+
+### Entry point
+
+The app boots at `login.html`. On successful login the session is stored in `sessionStorage` and the user is redirected to `index.html`. If the session is missing or expired, `index.html` redirects back to `login.html` immediately.
+
+### Roles & Permissions
+
+| Action               | Admin | Manager | Agent | Viewer |
+|----------------------|:-----:|:-------:|:-----:|:------:|
+| View all items       |  ✓    |    ✓    |       |   ✓    |
+| View own + unassigned|  ✓    |    ✓    |  ✓    |   ✓    |
+| Update status        |  ✓    |    ✓    |  ✓    |        |
+| Send replies         |  ✓    |    ✓    |  ✓    |        |
+| Assign / reassign    |  ✓    |    ✓    |       |        |
+| Change priority      |  ✓    |    ✓    |       |        |
+| Manage users         |  ✓    |         |       |        |
+
+Permissions are enforced in two places:
+1. **`main.js`** — action event handlers check `can(action, user)` before calling the API
+2. **`ui.js`** — controls are rendered `disabled` or hidden based on role, so the UI communicates constraints clearly
+
+### Mock users (for demo / development)
+
+| Name          | Email                  | Password    | Role    |
+|---------------|------------------------|-------------|---------|
+| Admin User    | admin@company.com      | admin123    | Admin   |
+| Ahmed Hassan  | ahmed@company.com      | ahmed123    | Manager |
+| Sara Malik    | sara@company.com       | sara123     | Agent   |
+| Khalid Nasser | khalid@company.com     | khalid123   | Agent   |
+| Nour Ibrahim  | nour@company.com       | nour123     | Agent   |
+| Rami Saleh    | rami@company.com       | rami123     | Viewer  |
+
+### Spring Boot auth endpoint
+
+```java
+// POST /api/auth/login
+// Request:  { "email": "...", "password": "..." }
+// Response: { "token": "eyJ...", "user": { "id", "name", "email", "role", "avatar", "department" } }
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
+        // 1. Look up user by email
+        // 2. Verify bcrypt password
+        // 3. Generate JWT with role claim
+        // 4. Return token + user object
+        String token = jwtService.generateToken(user);
+        return ResponseEntity.ok(new LoginResponse(token, userDto));
+    }
+}
+```
+
+JWT should include `role` as a claim so the backend can enforce permissions on every protected endpoint.
+
+To switch from mock to real auth, in `js/auth.js`:
+1. Comment out the mock block in `login()`
+2. Uncomment the production `fetch` block
+3. Set `CONFIG.MOCK = false` in `js/api.js`
+
+### Session & token
+
+- Session stored in `sessionStorage` (clears on tab/browser close)
+- For persistent "remember me" sessions: swap `sessionStorage` → `localStorage` in `auth.js`
+- Token is included as `Authorization: Bearer <token>` on every API call automatically
+- If the backend returns `401`, the app clears the session and redirects to `login.html`

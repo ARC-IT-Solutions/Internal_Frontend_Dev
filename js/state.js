@@ -23,6 +23,7 @@ const State = (() => {
 
   let _soundEnabled   = true;
   let _lastSyncTime   = null;
+  let _currentUser    = null;   // set after login, { id, name, email, role, avatar, department }
 
   let _listeners = {};
 
@@ -158,6 +159,10 @@ const State = (() => {
   function setLastSync(d)  { _lastSyncTime = d; emit('sync:updated', d); }
   function getLastSync()   { return _lastSyncTime; }
 
+  // ─── Current user ──────────────────────────────────────────────────────────
+  function setCurrentUser(user) { _currentUser = user; emit('user:set', user); }
+  function getCurrentUser()     { return _currentUser; }
+
   // ─── Employees / Clients ───────────────────────────────────────────────────
   function setEmployees(list)  { _employees = list; }
   function getEmployees()      { return _employees; }
@@ -197,6 +202,9 @@ const State = (() => {
     // Employees / Clients
     setEmployees, getEmployees,
     setClients, getClients,
+
+    // Current user
+    setCurrentUser, getCurrentUser,
 
     getTotalUnread,
   };

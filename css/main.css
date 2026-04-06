@@ -475,3 +475,162 @@ button { font-family: var(--font-ui); }
 
 /* ─── Util ────────────────────────────────────────────────── */
 .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+
+/* ─── Auth: user chip & role badges ──────────────────────── */
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #185FA5; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; flex-shrink: 0;
+}
+
+.user-info {
+  display: flex; flex-direction: column; gap: 1px;
+  line-height: 1;
+}
+
+.user-name {
+  font-size: 12px; font-weight: 500; color: var(--t-sec);
+  white-space: nowrap;
+}
+
+.role-badge {
+  font-size: 10px; font-weight: 600; font-family: var(--font-mono);
+  padding: 1px 5px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .04em;
+  display: inline-block;
+}
+
+/* Role badge colors */
+.role-admin   { background: rgba(240,136,62,.15); color: var(--c-amber); }
+.role-manager { background: rgba(56,139,253,.15);  color: var(--c-blue); }
+.role-agent   { background: rgba(63,185,80,.15);   color: var(--c-green); }
+.role-viewer  { background: rgba(139,148,158,.12); color: var(--t-sec); }
+
+/* Logout button */
+.logout-btn {
+  display: flex; align-items: center; gap: 5px;
+  color: var(--t-mute);
+}
+.logout-btn:hover { color: var(--c-red) !important; border-color: rgba(248,81,73,.3) !important; }
+
+/* ─── Role-gated UI (CSS layer) ───────────────────────────── */
+
+/* Viewer role: disable all interactive controls visually */
+html[data-role="viewer"] select:not(:disabled),
+html[data-role="viewer"] button.btn:not(.btn-primary):not(.btn-whatsapp):not([id="logout-btn"]) {
+  opacity: .4; pointer-events: none;
+}
+
+/* Permission note */
+.perm-note {
+  font-size: 12px; color: var(--t-mute);
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  padding: 7px 10px; margin-bottom: 10px;
+}
+
+/* Lock icon on restricted fields */
+.lock-icon { font-size: 10px; opacity: .6; }
+
+/* ─── Reply thread ────────────────────────────────────────── */
+#reply-thread { margin-bottom: 12px; }
+
+.reply-item {
+  padding: 10px 12px; border-radius: var(--r-md);
+  margin-bottom: 8px; border: 1px solid var(--border-1);
+}
+.reply-staff  { background: var(--bg-elevated); }
+.reply-client { background: rgba(56,139,253,.06); border-color: rgba(56,139,253,.12); }
+
+.reply-meta {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 5px;
+}
+.reply-author { font-size: 12px; font-weight: 600; color: var(--t-pri); }
+.reply-time   { font-size: 11px; color: var(--t-mute); font-family: var(--font-mono); margin-left: auto; }
+.reply-body   { font-size: 13px; color: var(--t-sec); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+.reply-compose { margin-top: 10px; }
+.reply-compose textarea {
+  width: 100%; padding: 9px 11px; border-radius: var(--r-md);
+  border: 1px solid var(--border-2); background: var(--bg-surface);
+  color: var(--t-pri); font-size: 13px; font-family: var(--font-ui);
+  resize: vertical; outline: none; line-height: 1.5;
+}
+.reply-compose textarea:focus { border-color: var(--c-blue); }
+.reply-compose textarea::placeholder { color: var(--t-mute); }
+
+.reply-actions {
+  display: flex; align-items: center; gap: 8px; margin-top: 7px;
+  justify-content: flex-end;
+}
+.reply-hint { font-size: 11px; color: var(--t-mute); margin-right: auto; }
+
+/* ─── User chip (topbar) ──────────────────────────────────── */
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+}
+.user-info {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+}
+.user-name {
+  font-size: 12px; font-weight: 500; color: var(--t-pri); line-height: 1;
+}
+
+/* Role badges */
+.role-badge {
+  font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 2px 5px; border-radius: 3px; line-height: 1;
+}
+.role-admin   { background: rgba(240,136,62,.18); color: var(--c-amber); }
+.role-manager { background: rgba(56,139,253,.18);  color: var(--c-blue); }
+.role-agent   { background: rgba(63,185,80,.18);   color: var(--c-green); }
+.role-viewer  { background: rgba(139,148,158,.15); color: var(--t-sec); }
+
+/* Logout button */
+.logout-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--r-md);
+  border: 1px solid var(--border-1); background: transparent;
+  color: var(--t-mute); cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.logout-btn:hover {
+  background: rgba(248,81,73,.1); border-color: rgba(248,81,73,.3);
+  color: var(--c-red);
+}
+
+/* ─── Permission UI helpers ───────────────────────────────── */
+.perm-note {
+  font-size: 11px; color: var(--t-mute); margin-top: 8px;
+  font-style: italic;
+}
+.perm-lock {
+  font-size: 10px; opacity: .6; cursor: help; margin-left: 2px;
+}
+
+/* Disabled selects styled consistently */
+select:disabled {
+  opacity: .45; cursor: not-allowed;
+}
+
+/* Viewer role: dim all action buttons globally via [data-role] on <html> */
+html[data-role="viewer"] .btn-primary:not(a),
+html[data-role="viewer"] .btn-secondary,
+html[data-role="viewer"] .btn-success,
+html[data-role="viewer"] .btn-whatsapp:not(a) {
+  opacity: .4; cursor: not-allowed; pointer-events: none;
+}
+/* But keep link-buttons (call/whatsapp/email) always active for viewers */
+html[data-role="viewer"] a.btn { opacity: 1; pointer-events: auto; cursor: pointer; }
+
+/* ─── Reply thread additions ──────────────────────────────── */
+.no-replies {
+  color: var(--t-mute); font-size: 13px; padding: 8px 0; font-style: italic;
+}

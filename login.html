@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sign In — Lead Console</title>
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+
+<div class="login-shell">
+
+  <!-- Left panel: branding -->
+  <div class="login-brand-panel" aria-hidden="true">
+    <div class="brand-content">
+      <div class="brand-mark">
+        <div class="brand-dot"></div>
+        <div class="brand-dot brand-dot-2"></div>
+        <div class="brand-dot brand-dot-3"></div>
+      </div>
+      <h1 class="brand-name">Lead Console</h1>
+      <p class="brand-tagline">Internal operations dashboard<br>for your sales &amp; support team.</p>
+
+      <div class="brand-stats">
+        <div class="stat-item">
+          <span class="stat-num">3</span>
+          <span class="stat-label">Active modules</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">4</span>
+          <span class="stat-label">Access roles</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">15s</span>
+          <span class="stat-label">Sync interval</span>
+        </div>
+      </div>
+    </div>
+    <div class="brand-footer">Internal use only · Not for public access</div>
+  </div>
+
+  <!-- Right panel: login form -->
+  <div class="login-form-panel">
+    <div class="form-container">
+
+      <div class="form-header">
+        <h2 class="form-title">Sign in</h2>
+        <p class="form-sub">Use your company email and password</p>
+      </div>
+
+      <!-- Error alert -->
+      <div id="login-error" class="alert alert-error" role="alert" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="login-error-text">Invalid credentials.</span>
+      </div>
+
+      <!-- Form -->
+      <div class="form-body" id="login-form">
+
+        <div class="field-group">
+          <label class="field-label" for="email">Email address</label>
+          <input
+            type="email" id="email" name="email"
+            class="field-input" placeholder="you@company.com"
+            autocomplete="email" autofocus required
+            aria-required="true"
+          />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="password">
+            Password
+            <button type="button" class="forgot-link" id="forgot-btn" tabindex="-1">Forgot?</button>
+          </label>
+          <div class="input-wrap">
+            <input
+              type="password" id="password" name="password"
+              class="field-input" placeholder="••••••••"
+              autocomplete="current-password" required
+              aria-required="true"
+            />
+            <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password" tabindex="-1">
+              <svg id="pw-eye-show" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="pw-eye-hide" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="field-group field-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="remember-me" />
+            <span>Keep me signed in</span>
+          </label>
+        </div>
+
+        <button type="button" class="submit-btn" id="login-btn">
+          <span id="btn-text">Sign in</span>
+          <span id="btn-spinner" class="spinner" style="display:none"></span>
+        </button>
+
+      </div>
+
+      <!-- Demo credentials hint -->
+      <div class="demo-creds" id="demo-creds">
+        <div class="demo-label">Demo credentials</div>
+        <div class="demo-grid">
+          <button class="demo-role-btn" data-email="admin@company.com"   data-pw="admin123"   data-role="Admin">
+            <span class="role-dot role-admin"></span>Admin
+          </button>
+          <button class="demo-role-btn" data-email="ahmed@company.com"   data-pw="ahmed123"   data-role="Manager">
+            <span class="role-dot role-manager"></span>Manager
+          </button>
+          <button class="demo-role-btn" data-email="sara@company.com"    data-pw="sara123"    data-role="Agent">
+            <span class="role-dot role-agent"></span>Agent
+          </button>
+          <button class="demo-role-btn" data-email="rami@company.com"    data-pw="rami123"    data-role="Viewer">
+            <span class="role-dot role-viewer"></span>Viewer
+          </button>
+        </div>
+        <p class="demo-note">Each role has different permissions. Try them to see the difference.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { login, getSession } from './js/auth.js';
+
+// If already logged in, skip login page
+if (getSession()) { window.location.replace('index.html'); }
+
+const emailEl    = document.getElementById('email');
+const pwEl       = document.getElementById('password');
+const loginBtn   = document.getElementById('login-btn');
+const btnText    = document.getElementById('btn-text');
+const btnSpinner = document.getElementById('btn-spinner');
+const errorBox   = document.getElementById('login-error');
+const errorText  = document.getElementById('login-error-text');
+const togglePw   = document.getElementById('toggle-pw');
+const eyeShow    = document.getElementById('pw-eye-show');
+const eyeHide    = document.getElementById('pw-eye-hide');
+
+function showError(msg) {
+  errorText.textContent = msg;
+  errorBox.style.display = 'flex';
+  errorBox.setAttribute('aria-live', 'assertive');
+}
+function hideError() { errorBox.style.display = 'none'; }
+
+function setLoading(on) {
+  loginBtn.disabled = on;
+  btnText.style.display  = on ? 'none'  : 'inline';
+  btnSpinner.style.display = on ? 'inline-block' : 'none';
+}
+
+async function doLogin() {
+  hideError();
+  const email    = emailEl.value.trim();
+  const password = pwEl.value;
+  if (!email || !password) { showError('Please enter your email and password.'); return; }
+
+  setLoading(true);
+  const { ok, user, error } = await login(email, password);
+  setLoading(false);
+
+  if (!ok) { showError(error || 'Login failed.'); pwEl.value = ''; pwEl.focus(); return; }
+
+  // Redirect to console
+  window.location.replace('index.html');
+}
+
+// Events
+loginBtn.addEventListener('click', doLogin);
+[emailEl, pwEl].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); }));
+
+// Password visibility toggle
+togglePw.addEventListener('click', () => {
+  const hidden = pwEl.type === 'password';
+  pwEl.type = hidden ? 'text' : 'password';
+  eyeShow.style.display = hidden ? 'none'  : 'block';
+  eyeHide.style.display = hidden ? 'block' : 'none';
+  togglePw.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+});
+
+// Demo credential fill
+document.querySelectorAll('.demo-role-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    emailEl.value = btn.dataset.email;
+    pwEl.value    = btn.dataset.pw;
+    hideError();
+    loginBtn.focus();
+  });
+});
+
+// Forgot password
+document.getElementById('forgot-btn').addEventListener('click', () => {
+  showError('Contact your system administrator to reset your password.');
+});
+</script>
+
+</body>
+</html>
