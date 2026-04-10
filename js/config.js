@@ -9,8 +9,8 @@
  */
 
 // ── Change this one line to switch environments ──────────────
-// export const BASE_URL = 'https://backend-prod-9t0y.onrender.com/api/v1';
-export const BASE_URL  = 'https://localhost:8000/api/vi';
+export const BASE_URL = 'https://backend-prod-9t0y.onrender.com/api/v1';
+// export const BASE_URL  = 'https://localhost:8000/api/vi';
 
 // ── Derived endpoint builders (never edit below this line) ───
 
