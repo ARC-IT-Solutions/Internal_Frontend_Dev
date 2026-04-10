@@ -1,166 +1,164 @@
 /**
  * auth.js
- * Authentication & session management.
- *
- * Roles:
- *   admin       — full access: all inquiries, all tickets, user management view, reports
- *   manager     — all inquiries, all tickets, can assign/reassign, cannot manage users
- *   agent       — only assigned inquiries/tickets + unassigned, cannot access other agents' items
- *   viewer      — read-only across everything, no status changes
- *
- * Session stored in sessionStorage (clears on tab close).
- * For persistent login across tabs, swap to localStorage.
- *
- * In production: token comes from Spring Boot JWT response.
- * Here: mock users are defined inline. Set MOCK: false in api.js to use real backend.
+ * Authentication, session, token refresh, and role permissions.
+ * All API calls use ENDPOINTS from config.js.
  */
 
-const SESSION_KEY = 'lc_session';
+import { ENDPOINTS } from './config.js';
 
-// ─── Role definitions ──────────────────────────────────────────────────────────
-export const ROLES = {
-  admin:   { label: 'Admin',   level: 4 },
-  manager: { label: 'Manager', level: 3 },
-  agent:   { label: 'Agent',   level: 2 },
-  viewer:  { label: 'Viewer',  level: 1 },
-};
+const SESSION_KEY  = 'lc_session';
+const REFRESH_KEY  = 'lc_refresh';
 
-// ─── Permission matrix ─────────────────────────────────────────────────────────
+// ─── Role permission matrix ────────────────────────────────────────────────────
 export const CAN = {
-  updateStatus:   (role) => ['admin','manager','agent'].includes(role),
-  assign:         (role) => ['admin','manager'].includes(role),
-  reassign:       (role) => ['admin','manager'].includes(role),
-  reply:          (role) => ['admin','manager','agent'].includes(role),
-  updatePriority: (role) => ['admin','manager'].includes(role),
-  viewAllItems:   (role) => ['admin','manager','viewer'].includes(role),
-  manageUsers:    (role) => role === 'admin',
-  exportData:     (role) => ['admin','manager'].includes(role),
+  updateStatus:     role => ['admin','employee'].includes(role),
+  assign:           role => ['admin','employee'].includes(role),
+  updatePriority:   role => ['admin','employee'].includes(role),
+  reply:            role => ['admin','employee'].includes(role),
+  deleteRecords:    role => role === 'admin',
+  manageUsers:      role => role === 'admin',
+  viewAuditLogs:    role => role === 'admin',
+  createProject:    role => ['admin','employee'].includes(role),
+  createInvoice:    role => ['admin','employee'].includes(role),
+  uploadInvoice:    role => ['admin','employee'].includes(role),
+  reviewRequests:   role => ['admin','employee'].includes(role),
+  registerClient:   role => role === 'admin',
+  viewAllItems:     role => ['admin','employee'].includes(role),
+  changePassword:   role => true,
+  editProfile:      role => true,
 };
 
-// ─── Mock users (replace with real /api/auth/login in production) ──────────────
-export const MOCK_USERS = [
-  {
-    id: 'usr_001', name: 'Admin User',   email: 'admin@company.com',   password: 'admin123',
-    role: 'admin',   avatar: 'AU', department: 'Management',
-  },
-  {
-    id: 'usr_002', name: 'Ahmed Hassan',  email: 'ahmed@company.com',   password: 'ahmed123',
-    role: 'manager', avatar: 'AH', department: 'Sales',
-  },
-  {
-    id: 'usr_003', name: 'Sara Malik',    email: 'sara@company.com',    password: 'sara123',
-    role: 'agent',   avatar: 'SM', department: 'Support',
-  },
-  {
-    id: 'usr_004', name: 'Khalid Nasser', email: 'khalid@company.com',  password: 'khalid123',
-    role: 'agent',   avatar: 'KN', department: 'Support',
-  },
-  {
-    id: 'usr_005', name: 'Nour Ibrahim',  email: 'nour@company.com',    password: 'nour123',
-    role: 'agent',   avatar: 'NI', department: 'Sales',
-  },
-  {
-    id: 'usr_006', name: 'Rami Saleh',    email: 'rami@company.com',    password: 'rami123',
-    role: 'viewer',  avatar: 'RS', department: 'Operations',
-  },
-];
-
-// ─── Auth API ──────────────────────────────────────────────────────────────────
-
-/**
- * Attempt login. Returns { ok, user, error }.
- * In production: POST /api/auth/login → { token, user }
- * Store token, decode role from JWT or use returned user object.
- */
-export async function login(email, password) {
-  // ── MOCK ──
-  if (true /* swap: CONFIG.MOCK */) {
-    await new Promise(r => setTimeout(r, 600)); // simulate network
-    const user = MOCK_USERS.find(
-      u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password
-    );
-    if (!user) return { ok: false, error: 'Invalid email or password.' };
-    const session = {
-      token: `mock_token_${user.id}_${Date.now()}`,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, department: user.department },
-      expires: Date.now() + 8 * 60 * 60 * 1000, // 8 hour session
-    };
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return { ok: true, user: session.user };
-  }
-
-  // ── PRODUCTION ──
-  // try {
-  //   const res = await fetch('/api/auth/login', {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify({ email, password }),
-  //   });
-  //   if (!res.ok) {
-  //     const err = await res.json().catch(() => ({}));
-  //     return { ok: false, error: err.message || 'Login failed.' };
-  //   }
-  //   const { token, user } = await res.json();
-  //   const session = { token, user, expires: Date.now() + 8 * 60 * 60 * 1000 };
-  //   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  //   return { ok: true, user };
-  // } catch (e) {
-  //   return { ok: false, error: 'Network error. Please try again.' };
-  // }
+export function can(action, user) {
+  if (!user) return false;
+  return CAN[action] ? CAN[action](user.role) : false;
 }
 
-/**
- * Get current session user. Returns user object or null.
- */
+// ─── Session helpers ───────────────────────────────────────────────────────────
+export function saveSession(accessToken, user) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    access_token: accessToken,
+    user,
+    expires: Date.now() + 8 * 60 * 60 * 1000,
+  }));
+}
+
+export function saveRefreshToken(token) {
+  // Use localStorage so refresh survives tab close
+  if (token) localStorage.setItem(REFRESH_KEY, token);
+}
+
 export function getSession() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const session = JSON.parse(raw);
-    if (Date.now() > session.expires) {
-      sessionStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    return session.user;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get auth token for API calls.
- */
-export function getToken() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw).token : null;
+    const s = JSON.parse(raw);
+    if (Date.now() > s.expires) { clearSession(); return null; }
+    return s.user;
   } catch { return null; }
 }
 
-/**
- * Log out and clear session.
- */
-export function logout() {
+export function getAccessToken() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw).access_token : null;
+  } catch { return null; }
+}
+
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_KEY);
+}
+
+export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(REFRESH_KEY);
 }
 
-/**
- * Check if current user can perform an action.
- */
-export function can(action, currentUser) {
-  if (!currentUser) return false;
-  return CAN[action] ? CAN[action](currentUser.role) : false;
+export function logout() {
+  clearSession();
 }
 
-/**
- * For agents: check if item is visible to them.
- * Agents see items assigned to them + unassigned items.
- * Admins/managers/viewers see everything.
- */
-export function canViewItem(item, currentUser) {
-  if (!currentUser) return false;
-  if (CAN.viewAllItems(currentUser.role)) return true;
-  // agent: only their name or unassigned
-  const assignedTo = item.assigned_to || 'Unassigned';
-  return assignedTo === 'Unassigned' || assignedTo === currentUser.name;
+// ─── Login ─────────────────────────────────────────────────────────────────────
+export async function login(email, password) {
+  try {
+    const res = await fetch(ENDPOINTS.login(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { ok: false, error: err.detail || 'Invalid email or password.' };
+    }
+
+    const { access_token, refresh_token } = await res.json();
+
+    // Fetch the real user profile
+    const meRes = await fetch(ENDPOINTS.me(), {
+      headers: { 'Authorization': `Bearer ${access_token}` },
+    });
+    if (!meRes.ok) return { ok: false, error: 'Could not load user profile.' };
+
+    const user = await meRes.json();
+
+    // Block client-role users from accessing the internal console
+    if (user.role === 'client') {
+      return { ok: false, error: 'This portal is for employees only. Please use the client portal.' };
+    }
+
+    // Build a normalized user object
+    const normalized = {
+      id:         user.id,
+      name:       user.full_name,
+      email:      user.email,
+      phone:      user.phone,
+      role:       user.role,       // 'admin' | 'employee'
+      is_active:  user.is_active,
+      is_verified: user.is_verified,
+      avatar:     user.full_name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase(),
+    };
+
+    saveSession(access_token, normalized);
+    saveRefreshToken(refresh_token);
+
+    return { ok: true, user: normalized };
+  } catch (e) {
+    console.error('[Auth] login error:', e);
+    return { ok: false, error: 'Network error. Please check your connection.' };
+  }
+}
+
+// ─── Token refresh ─────────────────────────────────────────────────────────────
+let _refreshPromise = null;
+
+export async function refreshAccessToken() {
+  // Deduplicate concurrent refresh attempts
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+      const res = await fetch(ENDPOINTS.refresh(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) { clearSession(); return false; }
+
+      const { access_token } = await res.json();
+      const user = getSession();
+      if (user) saveSession(access_token, user);
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    } finally {
+      _refreshPromise = null;
+    }
+  })();
+
+  return _refreshPromise;
 }
