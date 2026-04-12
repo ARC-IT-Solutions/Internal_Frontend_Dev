@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-mono:  'DM Mono', monospace;
+
+  /* ARC IT brand palette */
+  --arc-bg:        #0e0c09;
+  --arc-bg-raised: #141209;
+  --arc-bg-card:   #1a1710;
+  --arc-border:    rgba(212, 190, 140, 0.10);
+  --arc-border-md: rgba(212, 190, 140, 0.18);
+  --arc-gold:      #c9a84c;
+  --arc-gold-lt:   #e8c96a;
+  --arc-cream:     #e8e0d0;
+  --arc-ivory:     #f5f0e8;
+  --arc-mute:      #7a7060;
+  --arc-dim:       #3d3828;
+}
+
+/* Staff console scrollbar */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.06) transparent; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); border-radius: 2px; }
+
+/* Client portal scrollbar — warmer */
+.client-portal ::-webkit-scrollbar-thumb { background: rgba(201,168,76,.12); }
+
+/* Autofill — staff dark */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 40px #161b22 inset !important;
+  -webkit-text-fill-color: #e6edf3 !important;
+  caret-color: #e6edf3;
+}
+
+/* Autofill — client portal */
+.client-portal input:-webkit-autofill,
+.client-portal input:-webkit-autofill:hover,
+.client-portal input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 40px #1a1710 inset !important;
+  -webkit-text-fill-color: #e8e0d0 !important;
+}
+
+/* Status flash */
+@keyframes newFlash {
+  0%   { background: rgba(201,168,76,.2); }
+  100% { background: transparent; }
+}
+.new-flash { animation: newFlash 1.4s ease-out; }
+
+/* Thin gold rule divider */
+.arc-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--arc-gold), transparent);
+  opacity: 0.25;
+}
+
+/* Editorial number display */
+.arc-stat {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--arc-gold);
+}
